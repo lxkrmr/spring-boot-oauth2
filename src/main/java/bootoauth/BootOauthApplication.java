@@ -46,7 +46,8 @@ public class BootOauthApplication extends WebSecurityConfigurerAdapter {
 
     @GetMapping("/error")
     public String error(HttpServletRequest request) {
-        String message = (String) request.getSession().getAttribute("error.message");
+        String message = (String) request.getSession()
+                                         .getAttribute("error.message");
         request.removeAttribute("error.message");
         return message;
     }
@@ -55,28 +56,29 @@ public class BootOauthApplication extends WebSecurityConfigurerAdapter {
     protected void configure(HttpSecurity http) throws Exception {
         SimpleUrlAuthenticationFailureHandler handler = new SimpleUrlAuthenticationFailureHandler("/");
 
-        http.authorizeRequests(a ->
-                        a.antMatchers("/", "/error", "/webjars/**")
-                                .permitAll()
-                                .anyRequest()
-                                .authenticated()
-                )
-                .csrf(c -> c.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()))
-                .logout(l -> l.logoutSuccessUrl("/").permitAll())
-                .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
-                .oauth2Login(o -> o.failureHandler((request, response, exception) -> {
-                            request.getSession().setAttribute("error.message", exception.getMessage());
-                            handler.onAuthenticationFailure(request, response, exception);
-                        })
-                );
+        http.authorizeRequests(a -> a.antMatchers("/", "/error", "/webjars/**")
+                                     .permitAll()
+                                     .anyRequest()
+                                     .authenticated()
+            )
+            .csrf(c -> c.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()))
+            .logout(l -> l.logoutSuccessUrl("/")
+                          .permitAll())
+            .exceptionHandling(e -> e.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
+            .oauth2Login(o -> o.failureHandler((request, response, exception) -> {
+                             request.getSession()
+                                    .setAttribute("error.message", exception.getMessage());
+                             handler.onAuthenticationFailure(request, response, exception);
+                         })
+            );
     }
 
     @Bean
     public WebClient rest(ClientRegistrationRepository clients, OAuth2AuthorizedClientRepository authz) {
         ServletOAuth2AuthorizedClientExchangeFilterFunction oauth2 = new ServletOAuth2AuthorizedClientExchangeFilterFunction(clients, authz);
         return WebClient.builder()
-                .filter(oauth2)
-                .build();
+                        .filter(oauth2)
+                        .build();
     }
 
     @Bean
@@ -84,22 +86,24 @@ public class BootOauthApplication extends WebSecurityConfigurerAdapter {
         DefaultOAuth2UserService delegate = new DefaultOAuth2UserService();
         return request -> {
             OAuth2User user = delegate.loadUser(request);
-            if (!"github".equals(request.getClientRegistration().getRegistrationId())) {
+            if (!"github".equals(request.getClientRegistration()
+                                        .getRegistrationId())) {
                 return user;
             }
 
             OAuth2AuthorizedClient client = new OAuth2AuthorizedClient(request.getClientRegistration(),
-                    user.getName(),
-                    request.getAccessToken());
+                                                                       user.getName(),
+                                                                       request.getAccessToken());
             String url = user.getAttribute("organizations_url");
             List<Map<String, Object>> orgs = rest.get()
-                    .uri(url)
-                    .attributes(oauth2AuthorizedClient(client))
-                    .retrieve()
-                    .bodyToMono(List.class)
-                    .block();
+                                                 .uri(url)
+                                                 .attributes(oauth2AuthorizedClient(client))
+                                                 .retrieve()
+                                                 .bodyToMono(List.class)
+                                                 .block();
 
-            if (orgs.stream().anyMatch(org -> "spring-projects".equals(org.get("login")))) {
+            if (orgs.stream()
+                    .anyMatch(org -> "spring-projects".equals(org.get("login")))) {
                 return user;
             }
 
